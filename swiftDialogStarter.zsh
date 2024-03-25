@@ -282,7 +282,7 @@ findSelfService(){
 }
 
 update_dialog () {
-    log_it "DIALOG: $1"
+    logging "DIALOG: $1"
     echo "$1" >> "$dialogLogFile"
 }
 
@@ -301,7 +301,7 @@ else
 fi
 }
 
-log_it () {
+logging () {
   timeStamp=$(date -j +%H:%M)
     if [[ ! -z "$1" && -z "$2" ]]; then
         logEvent="INFO"
@@ -520,7 +520,7 @@ for (( i=1; $i<policyArrayLength; i++ )); do
     currentTitle="$policyArrayTitle[$i]"
     currentCommand="$policyArrayCommand[$i]"
 
-    log_it "$currentTitle.."
+    logging "$currentTitle.."
     update_dialog "listitem: title: $currentTitle, status: wait"
 
     if [[ $testingMode != "false" ]];then
@@ -530,7 +530,7 @@ for (( i=1; $i<policyArrayLength; i++ )); do
       /usr/local/jamf/bin/jamf policy -event $currentCommand 2>&1 | tee -a "$dialogInstallerLog"
     fi
 
-    log_it "success" "Trigger $currentCommand was successfully executed."
+    logging "success" "Trigger $currentCommand was successfully executed."
     update_dialog "listitem: title: $currentTitle, status: success"
 
 done
