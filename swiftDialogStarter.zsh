@@ -132,7 +132,7 @@ selfServiceCustomWait=30
 #########################################################################################
 ## Computer Name
 #########################################################################################
-settingComputerName=true
+settingComputerName=false
 computerNameTitle="Setting Your Computer Name"
 
 computerNamingConvention(){
@@ -156,17 +156,16 @@ computerNamingConvention(){
 #########################################################################################
 ## Device Registration
 #########################################################################################
-deviceRegistration=true
-registrationTitle="Registering your Mac"
+deviceRegistration=false
 
 ## Set registration fields
-buildingReg=true
-departmentReg=true
-assetTagReg=true
-usernameReg=true
-emailReg=true
-FullNameReg=true
-computerReg=true
+buildingReg=false
+departmentReg=false
+assetTagReg=false
+usernameReg=false
+emailReg=false
+FullNameReg=false
+computerReg=false
 
 ## Set required registration fields
 buildingReq=false
@@ -177,6 +176,7 @@ emailReq=false
 FullNameReq=false
 computerReq=false
 
+registrationTitle="Registering your Mac"
 assetTagPromptTitle="Asset Tag"
 userNamePromptTitle="User Name"
 emailAddressPromptTitle="Email Address"
@@ -382,6 +382,12 @@ if [[ $computerReg == true ]];then
   registrationList+=("--textfield \"$computerNameVarTitle\"$computerReq,prompt=\"$computerNamePromptTitle\"")
 fi
 
+if [[ $fullScreen == true ]];then
+  fullScreenDiag="--blurscreen"
+else
+  fullScreenDiag=""
+fi
+
 ## Getting Self Service Custom Branding Icon from Jamf Pro
 if [[ $selfServiceCustomBranding != false ]];then 
 	open "$selfServiceAppName"
@@ -399,6 +405,8 @@ fi
 
 ## Installing SwiftDialog if not installed
 ## Find working code to do this
+
+
 if [[ $deviceRegistration == true ]];then
   theStepTitle+=("\"$registrationTitle\"")
 fi
@@ -430,7 +438,7 @@ dialogConfigRegister=(
 )
 
 dialogConfigSplash=(
-    "--blurscreen"
+    "$fullScreenDiag"
     "--title \"$dialogTitle\""
     "--icon \"$dialogIcon\""
     "--button1text \"\""
