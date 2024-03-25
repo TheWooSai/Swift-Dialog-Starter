@@ -103,10 +103,6 @@ selfServiceCustomWait=30
 # Options if not using dropdown alert box
     completeMainText='Your Mac is now finished with initial setup and configuration.'
 
-## Registration button text
-  registrationButtonText="Register your Computer"
-## List of departments, comma separated
-  departmentList="Marketing, IT, Support, Development, Things, Stuff, Timmy"
 
 #########################################################################################
 # Trigger to be used to call the policy
@@ -134,6 +130,77 @@ selfServiceCustomWait=30
   )
 
 #########################################################################################
+## Computer Name
+#########################################################################################
+settingComputerName=true
+computerNameTitle="Setting Your Computer Name"
+
+computerNamingConvention(){
+  ## Preset variables 
+  compSerial="$serialNumber"
+  compBuilding="$regBuilding"
+  compDepartment="$regDepartment"
+  compAssetTag="$regAssetTag"
+  compUsername="$regUserName"
+  compEmailAddress="$regEmailAddress"
+  compFullName="$regFullName"
+  compComputerName="$regComputerName"
+
+  ## Ex. computerName="Jamf-$compSerial-$compAssetTag-PS"
+  computerName="mac-$compSerial"
+
+  ## Returns Computer Name
+  echo "$computerName"
+}
+
+#########################################################################################
+## Device Registration
+#########################################################################################
+deviceRegistration=true
+registrationTitle="Registering your Mac"
+
+## Set registration fields
+buildingReg=true
+departmentReg=true
+assetTagReg=true
+usernameReg=true
+emailReg=true
+FullNameReg=true
+computerReg=true
+
+## Set required registration fields
+buildingReq=false
+departmentReq=false
+assetTagReq=false
+usernameReq=false
+emailReq=false
+FullNameReq=false
+computerReq=false
+
+assetTagPromptTitle="Asset Tag"
+userNamePromptTitle="User Name"
+emailAddressPromptTitle="Email Address"
+fullNamePromptTitle="Full name"
+computerNamePromptTitle="Computer Name"
+
+buildingVarTitle="Building"
+departmentVarTitle="Department"
+assetTagVarTitle="Asset Tag"
+userNameVarTitle="User Name"
+emailAddressVarTitle="Email Address"
+fullNameVarTitle="Full Name"
+computerNameVarTitle="Computer Name"
+
+## List of departments, comma separated
+  departmentList="Marketing, IT, Support, Development, Things, Stuff, Timmy"
+
+## List of buildings, comma separated
+  buildingList="Amsterdam, Katowice, Eau Claire, Minneapolis"
+
+## Registration button text
+  registrationButtonText="Register your Computer"
+
+#########################################################################################
 # Caffeinate / No Sleep Configuration
 #########################################################################################
 # Flag script to keep the computer from sleeping. BE VERY CAREFUL WITH THIS FLAG!
@@ -144,7 +211,6 @@ selfServiceCustomWait=30
 # allowed to sleep again once the DEPNotify app is quit as caffeinate is looking
 # at DEPNotify's process ID.
   noSleep=false
-
 
 #########################################################################################
 # Variables used by script
@@ -157,15 +223,15 @@ dialogLogFile="/var/tmp/dialog.log"
 dialogPath="/usr/local/bin/dialog"
 dialogTitle="$bannerTitle"
 
-## Gets logged in User
+## Get Serial Number
+serialNumber="$(ioreg -c IOPlatformExpertDevice -d 2 | awk -F\" '/IOPlatformSerialNumber/{print $(NF-1)}')"
+
+## Get logged in User and User ID
 currentUser="$( echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ && ! /loginwindow/ { print $3 }' )"
 currentUserID=$( /usr/bin/id -u "$currentUser" )
 
 ## dialogInstallerLog: Location of this script's log **DO NOT CHANGE**
 dialogInstallerLog="/var/log/dialogInstallerLog.log"
-
-## currentTime: Gets the time for the log **DO NOT CHANGE**
-currentTime=$(date -j +%H:%M)
 
 ## Finds Self Service App
 selfServiceAppName=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist self_service_app_path)
@@ -179,12 +245,8 @@ dialogWidth=650
 iconSize=120
 
 declare -a theStepTitle
-theStepTitle=(
-  "\"Registering your Mac\""
-)
 declare -a theStepCommand
-theStepCommand=(
-)
+declare -a registrationValues
 
 #########################################################################################
 ## Functions used by script
@@ -231,7 +293,16 @@ finish_dialog () {
     exit 0
 }
 
+requiredField(){
+if [[ $inputValue == true ]];then
+  echo ",required"
+else
+  echo ""
+fi
+}
+
 log_it () {
+  timeStamp=$(date -j +%H:%M)
     if [[ ! -z "$1" && -z "$2" ]]; then
         logEvent="INFO"
         logMessage="$1"
@@ -247,7 +318,7 @@ log_it () {
     fi
 
     if [[ ! -z "$logEvent" ]]; then
-        echo ">>[dialogInstallerLog.sh] :: $logEvent [$currentTime] :: $logMessage" >> "$dialogInstallerLog"
+        echo ">>[dialogInstallerLog.sh] :: $logEvent [$timeStamp] :: $logMessage" >> "$dialogInstallerLog"
     fi
 }
 
@@ -255,8 +326,64 @@ log_it () {
 ## Initialization
 #########################################################################################
 
+## formatting variables to lowercase
+selfServiceCustomBranding="$(lowerCase $selfServiceCustomBranding)"
+testingMode="$(lowerCase $testingMode)"
+noSleep="$(lowerCase $noSleep)"
+deviceRegistration="$(lowerCase $deviceRegistration)"
+buildingReg="$(lowerCase $buildingReg)"
+departmentReg="$(lowerCase $departmentReg)"
+assetTagReg="$(lowerCase $assetTagReg)"
+usernameReg="$(lowerCase $usernameReg)"
+emailReg="$(lowerCase $emailReg)"
+FullNameReg="$(lowerCase $FullNameReg)"
+computerReg="$(lowerCase $computerReg)"
+
+buildingReq="$(lowerCase $buildingReq)"
+departmentReq="$(lowerCase $departmentReq)"
+assetTagReq="$(lowerCase $assetTagReq)"
+usernameReq="$(lowerCase $usernameReq)"
+emailReq="$(lowerCase $emailReq)"
+FullNameReq="$(lowerCase $FullNameReq)"
+computerReq="$(lowerCase $computerReq)"
+
+if [[ $buildingReg == true ]];then
+  buildingReq=$(requiredField $buildingReq)
+  registrationList+=("--selecttitle \"$buildingVarTitle\"$buildingReq --selectvalues \"$buildingList\"")
+fi
+
+if [[ $departmentReg == true ]];then
+  departmentReq=$(requiredField $departmentReq)
+  registrationList+=("--selecttitle \"$departmentVarTitle\"$departmentReq --selectvalues \"$departmentList\"")
+fi
+
+if [[ $assetTagReg == true ]];then
+  assetTagReq=$(requiredField $assetTagReq)
+  registrationList+=("--textfield \"$assetTagVarTitle\"$assetTagReq,prompt=\"$assetTagPromptTitle\"")
+fi
+
+if [[ $usernameReg == true ]];then
+  usernameReq=$(requiredField $usernameReq)
+  registrationList+=("--textfield \"$userNameVarTitle\"$usernameReq,prompt=\"$userNamePromptTitle\"")
+fi
+
+if [[ $emailReg == true ]];then
+  emailReq=$(requiredField $emailReq)
+  registrationList+=("--textfield \"$emailAddressVarTitle\"$emailReq,prompt=\"$emailAddressPromptTitle\"")
+fi
+
+if [[ $FullNameReg == true ]];then
+  FullNameReq=$(requiredField $FullNameReq)
+  registrationList+=("--textfield \"$fullNameVarTitle\"$FullNameReq,prompt=\"$fullNamePromptTitle\"")
+fi
+
+if [[ $computerReg == true ]];then
+  computerReq=$(requiredField $computerReq)
+  registrationList+=("--textfield \"$computerNameVarTitle\"$computerReq,prompt=\"$computerNamePromptTitle\"")
+fi
+
 ## Getting Self Service Custom Branding Icon from Jamf Pro
-if [[ $(lowerCase $selfServiceCustomBranding) != false ]];then 
+if [[ $selfServiceCustomBranding != false ]];then 
 	open "$selfServiceAppName"
 	until [[ -f /Users/$currentUser/Library/Application\ Support/com.jamfsoftware.selfservice.mac/Documents/Images/brandingimage.png ]] || [[ $selfServiceCustomWait == 0 ]];do
 		sleep 1
@@ -272,6 +399,13 @@ fi
 
 ## Installing SwiftDialog if not installed
 ## Find working code to do this
+if [[ $deviceRegistration == true ]];then
+  theStepTitle+=("\"$registrationTitle\"")
+fi
+
+if [[ $settingComputerName == true ]];then
+  theStepTitle+=("\"$computerNameTitle\"")
+fi
 
 for policy in "${policyArray[@]}";do
   titleItem="$(echo "$policy" | cut -d ',' -f1)"
@@ -292,8 +426,7 @@ dialogConfigRegister=(
     "--message \"$mainText\""
     "--messagefont \"size=16\""
     "--ontop"
-    "--textfield \" Asset Tag\",required,prompt=\"USCISAsset\""
-    ## "--selecttitle \"Department\",required --selectvalues \"$departmentList\""
+    "${registrationList}"
 )
 
 dialogConfigSplash=(
@@ -319,34 +452,69 @@ for (( i=0; $i<=policyArrayLength; i++ )); do
     update_dialog "listitem: index: $i, status: pending"
 done
 
-## Device Registration
-update_dialog "listitem: index: 0, status: wait"
-sleep 1
-registrationRaw=$(eval "$dialogPath" "${dialogConfigRegister[*]}")
-update_dialog "activate:"
-
-regAsset=$(echo "$registrationRaw"  | grep "Asset Tag" | awk -F ": " '{print $NF}')
-regDept=$(echo "$registrationRaw"  | grep "Department" |grep -v index | awk -F ": " '{print $NF}')
-
-echo "Raw = $registrationRaw"
-## echo "Asset = $regAsset"
-## echo "Dept = $regDept"
-
-## do stuff here
-macName=LMJMF"${regAsset}"
-
-if [[ $(lowerCase $testingMode) != "false" ]];then
-  echo "$jamfPath recon -assetTag $regAsset -department $regDept" ## 2>&1 | tee -a "$dialogInstallerLog"
-  echo "$jamfPath setComputerName -name \"$macName\""
+if [[ $deviceRegistration == "true" ]];then
+  ## Device Registration
+  update_dialog "listitem: title: $registrationTitle, status: wait"
   sleep 1
-else
-  $jamfPath recon -assetTag "$regAsset" 2>&1 | tee -a "$dialogInstallerLog" ## -department "$regDept" 
-	$jamfPath setComputerName -name "$macName" 2>&1 | tee -a "$dialogInstallerLog"
-  sleep 1
+  registrationRaw=$(eval "$dialogPath" "${dialogConfigRegister[*]}")
+  update_dialog "activate:"
+
+
+  regBuilding="$(echo "$registrationRaw"  | grep "$buildingVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
+  regDepartment="$(echo "$registrationRaw"  | grep "$departmentVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
+  regAssetTag="$(echo "$registrationRaw"  | grep "$assetTagVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
+  regUserName="$(echo "$registrationRaw"  | grep "$userNameVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
+  regEmailAddress="$(echo "$registrationRaw"  | grep "$emailAddressVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
+  regFullName="$(echo "$registrationRaw"  | grep "$fullNameVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
+  regComputerName=$(echo "$registrationRaw"  | grep "$computerNameVarTitle" |grep -v index | awk -F ": " '{print $NF}')
+
+if [[ $buildingReg == true ]];then
+  registrationValues+="-building $regBuilding"
 fi
 
-update_dialog "listitem: index: 0, status: success"
+if [[ $departmentReg == true ]];then
+  registrationValues+="-department $regDepartment"
+fi
 
+if [[ $assetTagReg == true ]];then
+  registrationValues+="-assetTag \"$regAssetTag\""
+fi
+
+if [[ $usernameReg == true ]];then
+  registrationValues+="-endUsername \"$regUserName\""
+fi
+
+if [[ $emailReg == true ]];then
+  registrationValues+="-email \"$regEmailAddress\""
+fi
+
+if [[ $FullNameReg == true ]];then
+  registrationValues+="-realname \"$regFullName\""
+fi
+
+  ## do stuff here
+
+  if [[ $testingMode != "false" ]];then
+    echo "$jamfPath recon $registrationValues"
+    sleep 1
+  else
+    eval $jamfPath recon $registrationValues 2>&1 | tee -a "$dialogInstallerLog" 
+  fi
+  update_dialog "listitem: title: $registrationTitle, status: success"
+fi
+
+if [[ $settingComputerName == "true" ]];then
+  update_dialog "listitem: title: $computerNameTitle, status: wait"
+  macName=$(computerNamingConvention)
+  if [[ $testingMode != "false" ]];then
+    echo "$jamfPath setComputerName -name \"$macName\""
+    sleep 1
+  else
+    $jamfPath setComputerName -name \"$macName\" 2>&1 | tee -a "$dialogInstallerLog" 
+    sleep 1
+  fi
+  update_dialog "listitem: title: $computerNameTitle, status: success"
+fi
 
 for (( i=1; $i<policyArrayLength; i++ )); do
     currentTitle="$policyArrayTitle[$i]"
@@ -355,7 +523,7 @@ for (( i=1; $i<policyArrayLength; i++ )); do
     log_it "$currentTitle.."
     update_dialog "listitem: title: $currentTitle, status: wait"
 
-    if [[ $(lowerCase $testingMode) != "false" ]];then
+    if [[ $testingMode != "false" ]];then
       echo "/usr/local/jamf/bin/jamf policy -event $currentCommand" ## 2>&1  | tee -a "$dialogInstallerLog"
       sleep 1
     else
@@ -369,5 +537,4 @@ done
 
 update_dialog "button1text: Finish"
 update_dialog "message: $completeAlertText"
-## update_dialog "icon:: $dialogIcon"
 update_dialog "button1: enable"
