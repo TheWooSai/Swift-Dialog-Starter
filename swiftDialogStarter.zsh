@@ -51,7 +51,7 @@
 # General Appearance
 #########################################################################################
 # Flag the app to open fullscreen or as a window
-  fullScreen=true # Set variable to true or false
+  fullScreen=false # Set variable to true or false
 
 #########################################################################################
 # Custom Self Service Branding
@@ -211,6 +211,11 @@ computerNameVarTitle="Computer Name"
 # allowed to sleep again once the DEPNotify app is quit as caffeinate is looking
 # at DEPNotify's process ID.
   noSleep=false
+
+
+#########################################################################################
+## CORE LOGIC
+#########################################################################################
 
 #########################################################################################
 # Variables used by script
@@ -532,7 +537,7 @@ for (( i=1; $i<policyArrayLength; i++ )); do
     update_dialog "listitem: title: $currentTitle, status: wait"
 
     if [[ $testingMode != "false" ]];then
-      echo "/usr/local/jamf/bin/jamf policy -event $currentCommand" ## 2>&1  | tee -a "$dialogInstallerLog"
+      echo "/usr/local/jamf/bin/jamf policy -event $currentCommand"
       sleep 1
     else
       /usr/local/jamf/bin/jamf policy -event $currentCommand 2>&1 | tee -a "$dialogInstallerLog"
@@ -543,6 +548,6 @@ for (( i=1; $i<policyArrayLength; i++ )); do
 
 done
 
-update_dialog "button1text: Finish"
+update_dialog "button1text: $completeButtonText"
 update_dialog "message: $completeAlertText"
 update_dialog "button1: enable"
