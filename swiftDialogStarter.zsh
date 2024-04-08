@@ -25,7 +25,7 @@
 ## This script is heavily based on the DEPNotify-Starter 
 ## https://github.com/jamf/DEPNotify-Starter
 #########################################################################################
-## Version 0.3.0 Created by David Raabe, Jamf Professional Services
+## Version 0.3.1 Created by David Raabe, Jamf Professional Services
 #########################################################################################
 
 #########################################################################################
@@ -224,7 +224,9 @@ computerNameVarTitle="Computer Name"
 
 
 #########################################################################################
-## CORE LOGIC
+## CORE LOGIC - 
+## DO NOT MODIFY BEYOND THIS POINT
+## Here be Dragons!
 #########################################################################################
 
 #########################################################################################
@@ -303,6 +305,7 @@ finish_dialog () {
 
 
 requiredField(){
+  inputValue=$1
   if [[ $inputValue == true ]];then
     echo ",required"
   else
@@ -479,6 +482,7 @@ emailReq="$(lowerCase $emailReq)"
 FullNameReq="$(lowerCase $FullNameReq)"
 computerReq="$(lowerCase $computerReq)"
 
+echo "$buildingReq"
 registrationList+=($(registrationSetup "dropdown" "$buildingReg" "$buildingReq" "$buildingVarTitle" "$buildingList"))
 registrationList+=($(registrationSetup "dropdown" "$departmentReg" "$departmentReq" "$departmentVarTitle" "$departmentList"))
 registrationList+=($(registrationSetup "textfield" "$assetTagReg" "$assetTagReq" "$assetTagVarTitle" "$assetTagPromptTitle"))
@@ -486,6 +490,8 @@ registrationList+=($(registrationSetup "textfield" "$usernameReg" "$usernameReq"
 registrationList+=($(registrationSetup "textfield" "$emailReg" "$emailReq" "$emailAddressVarTitle" "$emailAddressPromptTitle"))
 registrationList+=($(registrationSetup "textfield" "$FullNameReg" "$FullNameReq" "$fullNameVarTitle" "$fullNamePromptTitle"))
 registrationList+=($(registrationSetup "textfield" "$computerReg" "$computerReq" "$computerNameVarTitle" "$computerNamePromptTitle"))
+
+echo "${registrationList}"
 
 if [[ $fullScreen == true ]];then
   fullScreenDiag="--blurscreen"
@@ -619,7 +625,6 @@ if [[ $deviceRegistration == "true" ]];then
     eval $jamfPath recon $registrationValues 2>&1 | tee -a "$dialogInstallerLog"
   else
     logging "warning" "No Registration values populated"
-    sleep $sleepTestingMode
   fi
   update_dialog "listitem: title: $registrationTitle, status: success"
 fi
