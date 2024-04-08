@@ -25,7 +25,7 @@
 ## This script is heavily based on the DEPNotify-Starter 
 ## https://github.com/jamf/DEPNotify-Starter
 #########################################################################################
-## Version 0.1.0 Created by David Raabe, Jamf Professional Services
+## Version 0.3.0 Created by David Raabe, Jamf Professional Services
 #########################################################################################
 
 #########################################################################################
@@ -47,11 +47,17 @@
 # Quit Key set to command + control + x
   testingMode=true # Set variable to true or false
 
+## Sets timer between steps in testing mode
+  sleepTestingMode=1
+
+## Defines if Swift Dialog attempts to install (if missing) in testing mode
+  dialogInstallTestingMode=false
+
 #########################################################################################
 # General Appearance
 #########################################################################################
 # Flag the app to open fullscreen or as a window
-  fullScreen=false # Set variable to true or false
+  fullScreen=true # Set variable to true or false
 
 #########################################################################################
 # Custom Self Service Branding
@@ -156,25 +162,25 @@ computerNamingConvention(){
 #########################################################################################
 ## Device Registration
 #########################################################################################
-deviceRegistration=false
+deviceRegistration=true
 
 ## Set registration fields
-buildingReg=false
-departmentReg=false
-assetTagReg=false
-usernameReg=false
-emailReg=false
-FullNameReg=false
-computerReg=false
+buildingReg=true
+departmentReg=true
+assetTagReg=true
+usernameReg=true
+emailReg=true
+FullNameReg=true
+computerReg=true
 
 ## Set required registration fields
-buildingReq=false
-departmentReq=false
-assetTagReq=false
-usernameReq=false
-emailReq=false
-FullNameReq=false
-computerReq=false
+buildingReq=true
+departmentReq=true
+assetTagReq=true
+usernameReq=true
+emailReq=true
+FullNameReq=true
+computerReq=true
 
 registrationTitle="Registering your Mac"
 assetTagPromptTitle="Asset Tag"
@@ -199,6 +205,10 @@ computerNameVarTitle="Computer Name"
 
 ## Registration button text
   registrationButtonText="Register your Computer"
+
+## Registration window title
+    registrationDialogTitle="Register Mac at $orgName"
+
 
 #########################################################################################
 # Caffeinate / No Sleep Configuration
@@ -234,6 +244,7 @@ serialNumber="$(ioreg -c IOPlatformExpertDevice -d 2 | awk -F\" '/IOPlatformSeri
 ## Get logged in User and User ID
 currentUser="$( echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ && ! /loginwindow/ { print $3 }' )"
 currentUserID=$( /usr/bin/id -u "$currentUser" )
+currentUserHomeFolder="$(dscl . -read /Users/"$currentUser" NFSHomeDirectory | awk '{print $NF}')"
 
 ## dialogInstallerLog: Location of this script's log **DO NOT CHANGE**
 dialogInstallerLog="/var/log/dialogInstallerLog.log"
@@ -245,13 +256,15 @@ selfServiceAppName=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.pl
 customCommandFile="/private/tmp/dialog.log"
 
 ## Dialog variables
-dialogHeightPerItem=55
-dialogWidth=650
-iconSize=120
+dialogHeightPerItem="55"
+dialogWidth="820"
+dialogHeightInitial="180"
+iconSize="120"
 
 declare -a theStepTitle
 declare -a theStepCommand
 declare -a registrationValues
+declare -a registrationList
 
 #########################################################################################
 ## Functions used by script
@@ -264,32 +277,22 @@ lowerCase(){
   echo "$lowerText"
 }
 
+
 checkForDock(){
-dockStatus=$(pgrep -x Dock)
-echo "Waiting for Desktop"
-while [ "$dockStatus" == "" ]; do
-	echo "Desktop is not loaded. Waiting."
-	sleep 2
-	dockStatus=$(pgrep -x Dock)
-done
-}
-
-findSelfService(){
-	for appTitle in /Applications/* ; do
-		bundleID=$(/usr/bin/plutil -extract CFBundleIdentifier raw "$appTitle/Contents/info.plist")
-		if [[ $bundleID == com.jamfsoftware.selfservice.mac ]];then
-			theApp=$(echo "$appTitle"| awk 'BEGIN{FS="/"} {print $NF}')
-			appName="$theApp"
-
-		fi
-	done
-	echo "$appName"
+  dockStatus=$(pgrep -x Dock)
+  echo "Waiting for Desktop"
+  while [ "$dockStatus" == "" ]; do
+    echo "Desktop is not loaded. Waiting."
+    sleep 2
+    dockStatus=$(pgrep -x Dock)
+  done
 }
 
 update_dialog () {
     logging "DIALOG: $1"
     echo "$1" >> "$dialogLogFile"
 }
+
 
 finish_dialog () {
     update_dialog "progresstext: $completeAlertText"
@@ -298,13 +301,128 @@ finish_dialog () {
     exit 0
 }
 
+
 requiredField(){
-if [[ $inputValue == true ]];then
-  echo ",required"
-else
-  echo ""
-fi
+  if [[ $inputValue == true ]];then
+    echo ",required"
+  else
+    echo ""
+  fi
 }
+
+
+registrationSetup(){
+  ##  Usage: registrationSetup fieldType nameReg nameReq nameTitle nameListPrompt
+  ## fieldType options are textfield, dropdown, radio
+  fieldType=$1
+  nameReg=$2
+  nameReqRaw=$3
+  nameTitle=$4
+  nameListPrompt=$5
+
+  nameReq=$(requiredField $nameReqRaw)
+
+  case $fieldType in
+    textfield)
+      selectionType="--textfield"
+      selectionValue=",prompt="
+      ;;
+    dropdown)
+      selectionType="--selecttitle"
+      selectionValue=" --selectvalues "
+      ;;
+    radio)
+      selectionType="--selecttitle"
+      nameReq=",radio$nameReq"
+      selectionValue=" --selectvalues "
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+
+  if [[ $nameReg == true ]];then
+    nameList=("$selectionType \"$nameTitle\"$nameReq$selectionValue\"$nameListPrompt\"")
+  fi
+  echo "$nameList"
+}
+
+
+registrationConfiguration(){
+  ## Usage ex. registrationConfiguration tFTest flag regValue
+  tFTest="$1"
+  flag="$2"
+  regValue="$3"
+
+  if [[ $tFTest == true && "$regValue" != "" && "$regValue" != "\"\"" ]];then
+    regOutput="$flag $regValue"
+  else
+    regOutput=""
+  fi
+  echo "$regOutput"
+}
+
+
+registrationCounterMath(){
+  ## Usage registrationCounterMath "valueToBeEvaluated" "origNumber"
+  valueToBeEvaluated="$1"
+  origNumber=$2
+  if [[ $valueToBeEvaluated == true ]];then
+    increment='1'
+  else
+    increment='0'
+  fi
+  
+  modNumber=$(($origNumber+$increment))
+  echo "$modNumber"
+
+}
+
+
+dialogInstall() {
+## Validate / install swiftDialog (Thanks, BIG-RAT, Setup-Your-Mac and @acodega!)
+
+    # Get the URL of the latest PKG From the Dialog GitHub repo
+    dialogURL=$(curl -L --silent --fail "https://api.github.com/repos/swiftDialog/swiftDialog/releases/latest" | awk -F '"' "/browser_download_url/ && /pkg\"/ { print \$4; exit }")
+
+    # Expected Team ID of the downloaded PKG
+    expectedDialogTeamID="PWA5E9TQ59"
+
+    logging "warning" "SwiftDilog not Instakked. Installing swiftDialog..."
+
+    # Create temporary working directory
+    tempDirectory=$( /usr/bin/mktemp -d "/private/tmp/dialog.$(date -j +%s)" )
+
+    # Download the installer package
+    /usr/bin/curl --location --silent "$dialogURL" -o "$tempDirectory/Dialog.pkg"
+
+    # Verify the download
+    teamID=$(/usr/sbin/spctl -a -vv -t install "$tempDirectory/Dialog.pkg" 2>&1 | awk '/origin=/ {print $NF }' | tr -d '()')
+
+    # Install the package if Team ID validates
+    if [[ "$expectedDialogTeamID" == "$teamID" ]]; then
+        /usr/sbin/installer -pkg "$tempDirectory/Dialog.pkg" -target /
+        sleep 2
+        if [[ -f /usr/local/bin/dialog ]];then
+          dialogVersion=$( /usr/local/bin/dialog --version )
+          logging "success" "swiftDialog version ${dialogVersion} installed; proceeding..."
+        else
+          # Display a so-called "simple" dialog if Team ID fails to validate
+          osascript -e 'display dialog "Please advise your Support Representative of the following error:\r\r• Dialog Team ID verification failed\r\r" with title "SwiftDialog Starter: Error" buttons {"Close"} with icon caution'
+          logging "error" "SwiftDialog has faild to install.  Please install SwiftDialog before proceeding"
+          exit 1
+        fi
+    else
+        # Display a so-called "simple" dialog if Team ID fails to validate
+        osascript -e 'display dialog "Please advise your Support Representative of the following error:\r\r• Dialog Team ID verification failed\r\r" with title "SwiftDialog Starter: Error" buttons {"Close"} with icon caution'
+        logging "error" "SwiftDialog has faild to install.  Please install SwiftDialog before proceeding"
+        exit 1
+    fi
+
+    # Remove the temporary working directory when done
+    /bin/rm -Rf "$tempDirectory"
+}
+
 
 logging () {
   timeStamp=$(date -j +%H:%M)
@@ -344,6 +462,15 @@ emailReg="$(lowerCase $emailReg)"
 FullNameReg="$(lowerCase $FullNameReg)"
 computerReg="$(lowerCase $computerReg)"
 
+regCount="0"
+regCount=$(registrationCounterMath "$buildingReg" "$regCount")
+regCount=$(registrationCounterMath "$departmentReg" "$regCount")
+regCount=$(registrationCounterMath "$assetTagReg" "$regCount")
+regCount=$(registrationCounterMath "$usernameReg" "$regCount")
+regCount=$(registrationCounterMath "$emailReg" "$regCount")
+regCount=$(registrationCounterMath "$FullNameReg" "$regCount")
+regCount=$(registrationCounterMath "$computerReg" "$regCount")
+
 buildingReq="$(lowerCase $buildingReq)"
 departmentReq="$(lowerCase $departmentReq)"
 assetTagReq="$(lowerCase $assetTagReq)"
@@ -352,46 +479,30 @@ emailReq="$(lowerCase $emailReq)"
 FullNameReq="$(lowerCase $FullNameReq)"
 computerReq="$(lowerCase $computerReq)"
 
-if [[ $buildingReg == true ]];then
-  buildingReq=$(requiredField $buildingReq)
-  registrationList+=("--selecttitle \"$buildingVarTitle\"$buildingReq --selectvalues \"$buildingList\"")
-fi
-
-if [[ $departmentReg == true ]];then
-  departmentReq=$(requiredField $departmentReq)
-  registrationList+=("--selecttitle \"$departmentVarTitle\"$departmentReq --selectvalues \"$departmentList\"")
-fi
-
-if [[ $assetTagReg == true ]];then
-  assetTagReq=$(requiredField $assetTagReq)
-  registrationList+=("--textfield \"$assetTagVarTitle\"$assetTagReq,prompt=\"$assetTagPromptTitle\"")
-fi
-
-if [[ $usernameReg == true ]];then
-  usernameReq=$(requiredField $usernameReq)
-  registrationList+=("--textfield \"$userNameVarTitle\"$usernameReq,prompt=\"$userNamePromptTitle\"")
-fi
-
-if [[ $emailReg == true ]];then
-  emailReq=$(requiredField $emailReq)
-  registrationList+=("--textfield \"$emailAddressVarTitle\"$emailReq,prompt=\"$emailAddressPromptTitle\"")
-fi
-
-if [[ $FullNameReg == true ]];then
-  FullNameReq=$(requiredField $FullNameReq)
-  registrationList+=("--textfield \"$fullNameVarTitle\"$FullNameReq,prompt=\"$fullNamePromptTitle\"")
-fi
-
-if [[ $computerReg == true ]];then
-  computerReq=$(requiredField $computerReq)
-  registrationList+=("--textfield \"$computerNameVarTitle\"$computerReq,prompt=\"$computerNamePromptTitle\"")
-fi
+registrationList+=($(registrationSetup "dropdown" "$buildingReg" "$buildingReq" "$buildingVarTitle" "$buildingList"))
+registrationList+=($(registrationSetup "dropdown" "$departmentReg" "$departmentReq" "$departmentVarTitle" "$departmentList"))
+registrationList+=($(registrationSetup "textfield" "$assetTagReg" "$assetTagReq" "$assetTagVarTitle" "$assetTagPromptTitle"))
+registrationList+=($(registrationSetup "textfield" "$usernameReg" "$usernameReq" "$userNameVarTitle" "$userNamePromptTitle"))
+registrationList+=($(registrationSetup "textfield" "$emailReg" "$emailReq" "$emailAddressVarTitle" "$emailAddressPromptTitle"))
+registrationList+=($(registrationSetup "textfield" "$FullNameReg" "$FullNameReq" "$fullNameVarTitle" "$fullNamePromptTitle"))
+registrationList+=($(registrationSetup "textfield" "$computerReg" "$computerReq" "$computerNameVarTitle" "$computerNamePromptTitle"))
 
 if [[ $fullScreen == true ]];then
   fullScreenDiag="--blurscreen"
 else
   fullScreenDiag=""
 fi
+
+if [[ ! -f /usr/local/bin/dialog ]];then
+  if [[ $testingMode != false && $dialogInstallTestingMode != true ]];then
+    echo "warning SwiftDilog not Installed. Your configuration doesn't install SwiftDialog"
+    echo "Please install SwiftDialog or change the variable on line 54"
+    exit 1
+  elif [[  $testingMode == false || $dialogInstallTestingMode == true ]];then 
+    echo "warning SwiftDilog not Installed. Installing swiftDialog..."
+    dialogInstall
+  fi
+fi 
 
 ## Getting Self Service Custom Branding Icon from Jamf Pro
 if [[ $selfServiceCustomBranding != false ]];then 
@@ -400,17 +511,15 @@ if [[ $selfServiceCustomBranding != false ]];then
 		sleep 1
 		selfServiceCustomWait=$(($selfServiceCustomWait-1))
 	done
-  echo "$selfServiceCustomWait"
   if [[ $selfServiceCustomWait -gt 0 ]];then
   	dialogIcon=$(/usr/libexec/PlistBuddy -c "print :com.jamfsoftware.selfservice.brandinginfo:iconURL" /Users/"$currentUser"/Library/Preferences/com.jamfsoftware.selfservice.mac.plist)
   fi
   
-  kill $(pgrep $(findSelfService))
+  kill $(pgrep $(basename "$selfServiceAppName"))
 fi
 
 ## Installing SwiftDialog if not installed
-## Find working code to do this
-
+## Find something that works (look at the code that BIG-RAT found)
 
 if [[ $deviceRegistration == true ]];then
   theStepTitle+=("\"$registrationTitle\"")
@@ -431,12 +540,21 @@ done
 
 policyArrayLength="${#theStepTitle[@]}"
 
+finalRegHeight=$(($dialogHeightInitial+200+$((15*$regCount))))
+finalConfigHeight=$(($dialogHeightInitial+$((44*$policyArrayLength))))
+
+if [[ $finalConfigHeight > $finalRegHeight ]];then
+  finalRegHeight="$finalConfigHeight"
+fi
+
 dialogConfigRegister=(
-    "--title \"$dialogTitle\""
+    "--title \"$registrationDialogTitle\""
     "--icon \"$dialogIcon\""
     "--button1text \"Register your Mac\""
     "--position centre"
     "--message \"$mainText\""
+    "--width \"$dialogWidth\""
+    "--height \"$finalRegHeight\""
     "--messagefont \"size=16\""
     "--ontop"
     "${registrationList}"
@@ -448,6 +566,8 @@ dialogConfigSplash=(
     "--icon \"$dialogIcon\""
     "--button1text \"\""
     "--button1disabled"
+    "--width \"$dialogWidth\""
+    "--height \"$finalConfigHeight\""
     "--message \"$mainText\""
     "--messagefont \"size=16\""
     "--position centre"
@@ -472,7 +592,7 @@ if [[ $deviceRegistration == "true" ]];then
   registrationRaw=$(eval "$dialogPath" "${dialogConfigRegister[*]}")
   update_dialog "activate:"
 
-
+  ## Parse registration responses
   regBuilding="$(echo "$registrationRaw"  | grep "$buildingVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
   regDepartment="$(echo "$registrationRaw"  | grep "$departmentVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
   regAssetTag="$(echo "$registrationRaw"  | grep "$assetTagVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
@@ -481,37 +601,25 @@ if [[ $deviceRegistration == "true" ]];then
   regFullName="$(echo "$registrationRaw"  | grep "$fullNameVarTitle" |grep -v index | awk -F ": " '{print $NF}')"
   regComputerName=$(echo "$registrationRaw"  | grep "$computerNameVarTitle" |grep -v index | awk -F ": " '{print $NF}')
 
-if [[ $buildingReg == true ]];then
-  registrationValues+="-building $regBuilding"
-fi
-
-if [[ $departmentReg == true ]];then
-  registrationValues+="-department $regDepartment"
-fi
-
-if [[ $assetTagReg == true ]];then
-  registrationValues+="-assetTag \"$regAssetTag\""
-fi
-
-if [[ $usernameReg == true ]];then
-  registrationValues+="-endUsername \"$regUserName\""
-fi
-
-if [[ $emailReg == true ]];then
-  registrationValues+="-email \"$regEmailAddress\""
-fi
-
-if [[ $FullNameReg == true ]];then
-  registrationValues+="-realname \"$regFullName\""
-fi
+  ## Configure recon flags from registration
+  registrationValues+=$(registrationConfiguration "$buildingReg" "-building" "$regBuilding")
+  registrationValues+=$(registrationConfiguration "$departmentReg" "-department" "$regDepartment")
+  registrationValues+=$(registrationConfiguration "$assetTagReg" "-assetTag" "$regAssetTag")
+  registrationValues+=$(registrationConfiguration "$usernameReg" "-endUsername" "$regUserName")
+  registrationValues+=$(registrationConfiguration "$emailReg" "-email" "$regEmailAddress")
+  registrationValues+=$(registrationConfiguration "$FullNameReg" "-realname" "$regFullName")
 
   ## do stuff here
 
-  if [[ $testingMode != "false" ]];then
+  if [[ $testingMode != "false" && $(echo $registrationValues| xargs) != "" ]];then
     echo "$jamfPath recon $registrationValues"
-    sleep 1
+    logging "$jamfPath recon $registrationValues"
+    sleep $sleepTestingMode
+  elif [[ $testingMode == "false" && $(echo $registrationValues| xargs) != "" ]];then
+    eval $jamfPath recon $registrationValues 2>&1 | tee -a "$dialogInstallerLog"
   else
-    eval $jamfPath recon $registrationValues 2>&1 | tee -a "$dialogInstallerLog" 
+    logging "warning" "No Registration values populated"
+    sleep $sleepTestingMode
   fi
   update_dialog "listitem: title: $registrationTitle, status: success"
 fi
@@ -521,10 +629,9 @@ if [[ $settingComputerName == "true" ]];then
   macName=$(computerNamingConvention)
   if [[ $testingMode != "false" ]];then
     echo "$jamfPath setComputerName -name \"$macName\""
-    sleep 1
+    sleep $sleepTestingMode
   else
     $jamfPath setComputerName -name \"$macName\" 2>&1 | tee -a "$dialogInstallerLog" 
-    sleep 1
   fi
   update_dialog "listitem: title: $computerNameTitle, status: success"
 fi
@@ -537,10 +644,10 @@ for (( i=1; $i<policyArrayLength; i++ )); do
     update_dialog "listitem: title: $currentTitle, status: wait"
 
     if [[ $testingMode != "false" ]];then
-      echo "/usr/local/jamf/bin/jamf policy -event $currentCommand"
-      sleep 1
+      echo "$jamfPath policy -event $currentCommand"
+      sleep $sleepTestingMode
     else
-      /usr/local/jamf/bin/jamf policy -event $currentCommand 2>&1 | tee -a "$dialogInstallerLog"
+      $jamfPath policy -event "$currentCommand" 2>&1 | tee -a "$dialogInstallerLog"
     fi
 
     logging "success" "Trigger $currentCommand was successfully executed."
