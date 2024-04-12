@@ -1,4 +1,5 @@
 #!/bin/zsh
+## set -x
 
 #########################################################################################
 # License information
@@ -57,7 +58,7 @@
 # General Appearance
 #########################################################################################
 # Flag the app to open fullscreen or as a window
-  fullScreen=true # Set variable to true or false
+  fullScreen=false # Set variable to true or false
 
 #########################################################################################
 # Custom Self Service Branding
@@ -382,7 +383,7 @@ registrationCounterMath(){
 }
 
 
-dialogInstall() {
+installDialog() {
 ## Validate / install swiftDialog (Thanks, BIG-RAT, Setup-Your-Mac and @acodega!)
 
     # Get the URL of the latest PKG From the Dialog GitHub repo
@@ -482,7 +483,6 @@ emailReq="$(lowerCase $emailReq)"
 FullNameReq="$(lowerCase $FullNameReq)"
 computerReq="$(lowerCase $computerReq)"
 
-echo "$buildingReq"
 registrationList+=($(registrationSetup "dropdown" "$buildingReg" "$buildingReq" "$buildingVarTitle" "$buildingList"))
 registrationList+=($(registrationSetup "dropdown" "$departmentReg" "$departmentReq" "$departmentVarTitle" "$departmentList"))
 registrationList+=($(registrationSetup "textfield" "$assetTagReg" "$assetTagReq" "$assetTagVarTitle" "$assetTagPromptTitle"))
@@ -490,8 +490,6 @@ registrationList+=($(registrationSetup "textfield" "$usernameReg" "$usernameReq"
 registrationList+=($(registrationSetup "textfield" "$emailReg" "$emailReq" "$emailAddressVarTitle" "$emailAddressPromptTitle"))
 registrationList+=($(registrationSetup "textfield" "$FullNameReg" "$FullNameReq" "$fullNameVarTitle" "$fullNamePromptTitle"))
 registrationList+=($(registrationSetup "textfield" "$computerReg" "$computerReq" "$computerNameVarTitle" "$computerNamePromptTitle"))
-
-echo "${registrationList}"
 
 if [[ $fullScreen == true ]];then
   fullScreenDiag="--blurscreen"
@@ -501,13 +499,15 @@ fi
 
 if [[ ! -f /usr/local/bin/dialog ]];then
   if [[ $testingMode != false && $dialogInstallTestingMode != true ]];then
-    echo "warning SwiftDilog not Installed. Your configuration doesn't install SwiftDialog"
-    echo "Please install SwiftDialog or change the variable on line 54"
+    logging "warning" "SwiftDilog not Installed. Your configuration doesn't install SwiftDialog"
+    logging "Please install SwiftDialog or change the variable on line 54"
     exit 1
   elif [[  $testingMode == false || $dialogInstallTestingMode == true ]];then 
-    echo "warning SwiftDilog not Installed. Installing swiftDialog..."
-    dialogInstall
+    logging "warning SwiftDilog not Installed. Installing swiftDialog..."
+    installDialog
   fi
+else
+  logging "SwiftDialog is installed.  Proceeding"
 fi 
 
 ## Getting Self Service Custom Branding Icon from Jamf Pro
@@ -633,7 +633,7 @@ if [[ $settingComputerName == "true" ]];then
   update_dialog "listitem: title: $computerNameTitle, status: wait"
   macName=$(computerNamingConvention)
   if [[ $testingMode != "false" ]];then
-    echo "$jamfPath setComputerName -name \"$macName\""
+    logging "$jamfPath setComputerName -name \"$macName\""
     sleep $sleepTestingMode
   else
     $jamfPath setComputerName -name \"$macName\" 2>&1 | tee -a "$dialogInstallerLog" 
