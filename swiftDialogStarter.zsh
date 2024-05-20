@@ -26,7 +26,7 @@
 ## This script is heavily based on the DEPNotify-Starter 
 ## https://github.com/jamf/DEPNotify-Starter
 #########################################################################################
-## Version 0.3.1 Created by David Raabe, Jamf Professional Services
+## Version 0.3.3 Created by David Raabe, Jamf Professional Services
 #########################################################################################
 
 #########################################################################################
@@ -58,7 +58,7 @@
 # General Appearance
 #########################################################################################
 # Flag the app to open fullscreen or as a window
-  fullScreen=false # Set variable to true or false
+  fullScreen=true # Set variable to true or false
 
 #########################################################################################
 # Custom Self Service Branding
@@ -163,7 +163,7 @@ computerNamingConvention(){
 #########################################################################################
 ## Device Registration
 #########################################################################################
-deviceRegistration=true
+deviceRegistration=false
 
 ## Set registration fields
 buildingReg=true
@@ -175,13 +175,13 @@ FullNameReg=true
 computerReg=true
 
 ## Set required registration fields
-buildingReq=true
-departmentReq=true
-assetTagReq=true
-usernameReq=true
-emailReq=true
-FullNameReq=true
-computerReq=true
+buildingReq=false
+departmentReq=false
+assetTagReq=false
+usernameReq=false
+emailReq=false
+FullNameReq=false
+computerReq=false
 
 registrationTitle="Registering your Mac"
 assetTagPromptTitle="Asset Tag"
@@ -645,14 +645,18 @@ for (( i=1; $i<policyArrayLength; i++ )); do
     currentTitle="$policyArrayTitle[$i]"
     currentCommand="$policyArrayCommand[$i]"
 
+    if [[ $currentCommand == "" ]];then
+      continue
+    fi
+
     logging "$currentTitle.."
     update_dialog "listitem: title: $currentTitle, status: wait"
 
     if [[ $testingMode != "false" ]];then
-      echo "$jamfPath policy -event $currentCommand"
+      echo "$jamfPath policy -"$policyTrigger" $currentCommand"
       sleep $sleepTestingMode
     else
-      $jamfPath policy -event "$currentCommand" 2>&1 | tee -a "$dialogInstallerLog"
+      $jamfPath policy -"$policyTrigger" "$currentCommand" 2>&1 | tee -a "$dialogInstallerLog"
     fi
 
     logging "success" "Trigger $currentCommand was successfully executed."
