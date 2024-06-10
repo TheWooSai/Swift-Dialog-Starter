@@ -193,13 +193,17 @@ emailReq=false
 FullNameReq=false
 computerReq=false
 
+
 registrationTitle="Registering your Mac"
+
+## Placeholder text in empty fields
 assetTagPromptTitle="Asset Tag"
 userNamePromptTitle="User Name"
 emailAddressPromptTitle="Email Address"
 fullNamePromptTitle="Full name"
 computerNamePromptTitle="Computer Name"
 
+## Display text for each field
 buildingVarTitle="Building"
 departmentVarTitle="Department"
 assetTagVarTitle="Asset Tag"
