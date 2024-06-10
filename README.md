@@ -8,4 +8,5 @@ Install [Swift Dialog](https://github.com/swiftDialog/swiftDialog).
 Download the swiftDialogStarter.zsh or clone this repo.
 Make the script executable.
 Ensure that testingMode is enabled `testingMode=true`
-
+Run the script (requires sudo)
+    The script makes no changes in testing mode by default.  Swift Dialog's default listening file is in a location that requires sudo to write to.  This will be updated in a future release (Probably /private/tmp)
