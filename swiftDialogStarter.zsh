@@ -26,7 +26,7 @@
 ## This script is heavily based on the DEPNotify-Starter 
 ## https://github.com/jamf/DEPNotify-Starter
 #########################################################################################
-## Version 0.3.3 Created by David Raabe, Jamf Professional Services
+## Version 0.3.6 Created by David Raabe, Jamf Professional Services
 #########################################################################################
 
 #########################################################################################
@@ -49,7 +49,7 @@
   testingMode=true # Set variable to true or false
 
 ## Sets timer between steps in testing mode
-  sleepTestingMode=1
+  sleepTestingMode=.2
 
 ## Defines if Swift Dialog attempts to install (if missing) in testing mode
   dialogInstallTestingMode=false
@@ -58,7 +58,7 @@
 # General Appearance
 #########################################################################################
 # Flag the app to open fullscreen or as a window
-  fullScreen=true # Set variable to true or false
+  fullScreen=false # Set variable to true or false
 
 #########################################################################################
 # Custom Self Service Branding
@@ -83,7 +83,7 @@ selfServiceCustomWait=30
 # Update the variable below replacing "Organization" with the actual name of your organization. 
 # Example "ACME Corp Inc."
   orgName="Organization"
-
+  ORG_NAME="$orgName"
 # Main heading that will be displayed under the image
 # If this variable is left blank, the generic banner will appear
   bannerTitle="Welcome to $orgName"
@@ -109,6 +109,16 @@ selfServiceCustomWait=30
     completeAlertText="Your Mac is now finished with initial setup and configuration. Press $completeButtonText to get started!"
 # Options if not using dropdown alert box
     completeMainText='Your Mac is now finished with initial setup and configuration.'
+
+## Perform action on the finalization button depression
+    performActionOnCompletion=false
+
+## Variable to determine if this command should run in testing mode
+    runCommandInTestingMode=false
+
+## Variable for the commmand to run when the finalization button is pushed
+## This will require testing if using a nonliteral statement, and may undergo changes in the future
+    commandToPerform='say -v Zarvox A wolf remains a wolf, even if it has not eaten your sheep'
 
 
 #########################################################################################
@@ -208,7 +218,7 @@ computerNameVarTitle="Computer Name"
   registrationButtonText="Register your Computer"
 
 ## Registration window title
-    registrationDialogTitle="Register Mac at $orgName"
+    registrationDialogTitle="Register Your Mac at $orgName"
 
 
 #########################################################################################
@@ -231,45 +241,6 @@ computerNameVarTitle="Computer Name"
 #########################################################################################
 
 #########################################################################################
-# Variables used by script
-#########################################################################################
-
-jamfPath="/usr/local/jamf/bin/jamf"
-
-### swiftDialog Variables
-dialogLogFile="/var/tmp/dialog.log"
-dialogPath="/usr/local/bin/dialog"
-dialogTitle="$bannerTitle"
-
-## Get Serial Number
-serialNumber="$(ioreg -c IOPlatformExpertDevice -d 2 | awk -F\" '/IOPlatformSerialNumber/{print $(NF-1)}')"
-
-## Get logged in User and User ID
-currentUser="$( echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ && ! /loginwindow/ { print $3 }' )"
-currentUserID=$( /usr/bin/id -u "$currentUser" )
-currentUserHomeFolder="$(dscl . -read /Users/"$currentUser" NFSHomeDirectory | awk '{print $NF}')"
-
-## dialogInstallerLog: Location of this script's log **DO NOT CHANGE**
-dialogInstallerLog="/var/log/dialogInstallerLog.log"
-
-## Finds Self Service App
-selfServiceAppName=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist self_service_app_path)
-
-## Command file location 
-customCommandFile="/private/tmp/dialog.log"
-
-## Dialog variables
-dialogHeightPerItem="55"
-dialogWidth="820"
-dialogHeightInitial="180"
-iconSize="120"
-
-declare -a theStepTitle
-declare -a theStepCommand
-declare -a registrationValues
-declare -a registrationList
-
-#########################################################################################
 ## Functions used by script
 #########################################################################################
 
@@ -284,11 +255,12 @@ lowerCase(){
 checkForDock(){
   dockStatus=$(pgrep -x Dock)
   echo "Waiting for Desktop"
-  while [ "$dockStatus" == "" ]; do
+  while [[ "$dockStatus" == "" ]]; do
     echo "Desktop is not loaded. Waiting."
     sleep 2
     dockStatus=$(pgrep -x Dock)
   done
+  echo "Dock Loaded"
 }
 
 update_dialog () {
@@ -392,7 +364,7 @@ installDialog() {
     # Expected Team ID of the downloaded PKG
     expectedDialogTeamID="PWA5E9TQ59"
 
-    logging "warning" "SwiftDilog not Instakked. Installing swiftDialog..."
+    logging "warning" "SwiftDilog not Installed. Installing swiftDialog..."
 
     # Create temporary working directory
     tempDirectory=$( /usr/bin/mktemp -d "/private/tmp/dialog.$(date -j +%s)" )
@@ -449,6 +421,52 @@ logging () {
     fi
 }
 
+
+#########################################################################################
+## DO NOTHING UNTIL DOCK IS LOADED
+#########################################################################################
+
+checkForDock
+
+#########################################################################################
+# Variables used by script
+#########################################################################################
+
+jamfPath="/usr/local/jamf/bin/jamf"
+
+### swiftDialog Variables
+dialogLogFile="/var/tmp/dialog.log"
+dialogPath="/usr/local/bin/dialog"
+dialogTitle="$bannerTitle"
+
+## Get Serial Number
+serialNumber="$(ioreg -c IOPlatformExpertDevice -d 2 | awk -F\" '/IOPlatformSerialNumber/{print $(NF-1)}')"
+
+## Get logged in User and User ID
+currentUser="$( echo "show State:/Users/ConsoleUser" | scutil | awk '/Name :/ && ! /loginwindow/ { print $3 }' )"
+currentUserID=$( /usr/bin/id -u "$currentUser" )
+currentUserHomeFolder="$(dscl . -read /Users/"$currentUser" NFSHomeDirectory | awk '{print $NF}')"
+
+## dialogInstallerLog: Location of this script's log **DO NOT CHANGE**
+dialogInstallerLog="/var/log/dialogInstallerLog.log"
+
+## Finds Self Service App
+selfServiceAppName=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist self_service_app_path)
+
+## Command file location 
+customCommandFile="/private/tmp/dialog.log"
+
+## Dialog variables
+dialogHeightPerItem="55"
+dialogWidth="820"
+dialogHeightInitial="180"
+iconSize="120"
+
+declare -a theStepTitle
+declare -a theStepCommand
+declare -a registrationValues
+declare -a registrationList
+
 #########################################################################################
 ## Initialization
 #########################################################################################
@@ -465,6 +483,17 @@ usernameReg="$(lowerCase $usernameReg)"
 emailReg="$(lowerCase $emailReg)"
 FullNameReg="$(lowerCase $FullNameReg)"
 computerReg="$(lowerCase $computerReg)"
+performActionOnCompletion="$(lowerCase $performActionOnCompletion)"
+runCommandInTestingMode="$(lowerCase $runCommandInTestingMode)"
+
+buildingReq="$(lowerCase $buildingReq)"
+departmentReq="$(lowerCase $departmentReq)"
+assetTagReq="$(lowerCase $assetTagReq)"
+usernameReq="$(lowerCase $usernameReq)"
+emailReq="$(lowerCase $emailReq)"
+FullNameReq="$(lowerCase $FullNameReq)"
+computerReq="$(lowerCase $computerReq)"
+
 
 regCount="0"
 regCount=$(registrationCounterMath "$buildingReg" "$regCount")
@@ -474,14 +503,6 @@ regCount=$(registrationCounterMath "$usernameReg" "$regCount")
 regCount=$(registrationCounterMath "$emailReg" "$regCount")
 regCount=$(registrationCounterMath "$FullNameReg" "$regCount")
 regCount=$(registrationCounterMath "$computerReg" "$regCount")
-
-buildingReq="$(lowerCase $buildingReq)"
-departmentReq="$(lowerCase $departmentReq)"
-assetTagReq="$(lowerCase $assetTagReq)"
-usernameReq="$(lowerCase $usernameReq)"
-emailReq="$(lowerCase $emailReq)"
-FullNameReq="$(lowerCase $FullNameReq)"
-computerReq="$(lowerCase $computerReq)"
 
 registrationList+=($(registrationSetup "dropdown" "$buildingReg" "$buildingReq" "$buildingVarTitle" "$buildingList"))
 registrationList+=($(registrationSetup "dropdown" "$departmentReg" "$departmentReq" "$departmentVarTitle" "$departmentList"))
@@ -535,6 +556,11 @@ if [[ $settingComputerName == true ]];then
   theStepTitle+=("\"$computerNameTitle\"")
 fi
 
+if [[ $performActionOnCompletion == true ]];then
+  buttonCommandFinal="--button1shellaction \"spawn { $commandToPerform } &\""
+##  buttonCommandFinal="--button1shellaction \"sleep 10\""
+fi
+
 for policy in "${policyArray[@]}";do
   titleItem="$(echo "$policy" | cut -d ',' -f1)"
   triggerItem="$(echo "$policy" | cut -d ',' -f2)"
@@ -577,6 +603,7 @@ dialogConfigSplash=(
     "--message \"$mainText\""
     "--messagefont \"size=16\""
     "--position centre"
+    \'$buttonCommandFinal\'
     "${theStepTitle[@]/#/--listitem }"
 )
 
@@ -633,15 +660,16 @@ if [[ $settingComputerName == "true" ]];then
   update_dialog "listitem: title: $computerNameTitle, status: wait"
   macName=$(computerNamingConvention)
   if [[ $testingMode != "false" ]];then
+    echo "$jamfPath setComputerName -name \"$macName\""
     logging "$jamfPath setComputerName -name \"$macName\""
     sleep $sleepTestingMode
   else
-    $jamfPath setComputerName -name \"$macName\" 2>&1 | tee -a "$dialogInstallerLog" 
+    $jamfPath setComputerName -name "$macName" 2>&1 | tee -a "$dialogInstallerLog" 
   fi
   update_dialog "listitem: title: $computerNameTitle, status: success"
 fi
 
-for (( i=1; $i<policyArrayLength; i++ )); do
+for (( i=1; $i<=policyArrayLength; i++ )); do
     currentTitle="$policyArrayTitle[$i]"
     currentCommand="$policyArrayCommand[$i]"
 
@@ -664,6 +692,11 @@ for (( i=1; $i<policyArrayLength; i++ )); do
 
 done
 
+
 update_dialog "button1text: $completeButtonText"
 update_dialog "message: $completeAlertText"
 update_dialog "button1: enable"
+
+
+
+
