@@ -125,8 +125,8 @@ selfServiceCustomWait=30
 # Trigger to be used to call the policy
 #########################################################################################
 # Policies can be called be either a custom trigger or by policy id.
-# Select either event, to call the policy by the custom trigger,
-# or id to call the policy by id.
+# Select either "event", to call the policy by the custom trigger,
+# or "id" to call the policy by id.
 	policyTrigger="event"
 
 #########################################################################################

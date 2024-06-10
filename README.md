@@ -12,3 +12,7 @@ Run the script (requires sudo)
 
 _The script makes no changes in testing mode by default.  Swift Dialog's default listening file is in a location that requires sudo to write to.  This will be updated in a future release (Probably /private/tmp)_
 
+# Configuration
+
+The primary usage of this as an onboarding tool is policy execution and software installation.  The variable to look for is `policyArray`.  Each policy should have its own line.  
+Policies can be called be either a custom trigger or by policy ID. Custom trigger is the default selection. Use "**event**" to use custom triggers.  Use "**id**" to use policy ID
